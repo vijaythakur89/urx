@@ -135,6 +135,7 @@ URX abstracts all of this into a single workflow.
 This is an early-stage project (MVP). Contributions and feedback are welcome.
 
 ---
+
 ## 🏗 Architecture
 
 - CLI (Cobra)
@@ -142,6 +143,15 @@ This is an early-stage project (MVP). Contributions and feedback are welcome.
 - Runtime engine (Docker)
 - Metadata store (~/.urx)
 - --
+
+## 💻 Platform Support
+
+- Linux (tested)
+- macOS (should work with Docker)
+- Windows (via WSL recommended)
+
+> Requires Docker to be installed and running.
+
 ## 📜 License
 
 MIT
