@@ -53,9 +53,6 @@ running...
 
 ---
 
-## ⚙️ Installation (corrected)
-
-```md
 ## ⚙️ Installation
 
 > Requires Docker to be installed and running.
