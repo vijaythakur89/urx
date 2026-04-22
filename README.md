@@ -12,7 +12,7 @@ URX is a CLI tool that packages applications into portable `.urx` artifacts and 
 git clone https://github.com/vijaythakur89/urx.git
 cd urx
 go build -o urx ./cmd/urx-cli
-sudo mv urx /usr/local/bin/
+sudo mv ./urx /usr/local/bin/
 ```
 
 ---
@@ -22,7 +22,7 @@ sudo mv urx /usr/local/bin/
 ```bash
 urx build demo
 urx run app.urx
-urx ps
+urx ps #to get the run ID.
 urx logs <run-id>
 ```
 
