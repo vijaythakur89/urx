@@ -1,0 +1,4 @@
+name: demo
+runtime: python
+entrypoint: app.py
+isolation: low
