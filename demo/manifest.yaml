@@ -2,7 +2,8 @@ name: demo
 runtime: python
 entrypoint: app.py
 isolation: low
-
+port: 8080
+  
 volumes:
   - "/home/developer/urx/demo/data:/app/data"
 

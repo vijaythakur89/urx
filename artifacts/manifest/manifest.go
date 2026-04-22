@@ -6,7 +6,7 @@ type Manifest struct {
 	BaseImage  string   `yaml:"base_image"`
 	Entrypoint string `yaml:"entrypoint"`
 	Isolation  string `yaml:"isolation"`
-
+	Port	      int `yaml:"port"`
 	Volumes  []string `yaml:"volumes"`
 	Env      []string `yaml:"env"`
 }

@@ -2,9 +2,7 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -12,41 +10,62 @@ import (
 
 var psCmd = &cobra.Command{
 	Use:   "ps",
-	Short: "List URX runs with status",
+	Short: "List URX runs",
 	Run: func(cmd *cobra.Command, args []string) {
 
-		home, _ := os.UserHomeDir()
-		runsDir := filepath.Join(home, ".urx", "runs")
-
-		files, err := os.ReadDir(runsDir)
+		out, err := exec.Command("docker", "ps", "-a", "--format", "{{.Names}} {{.Status}}").Output()
 		if err != nil {
-			fmt.Println("No runs found")
+			fmt.Println("Error:", err)
 			return
 		}
 
-		fmt.Printf("%-25s %-10s\n", "ID", "STATUS")
-		fmt.Println("-----------------------------------------")
+		fmt.Printf("%-25s %-12s %-10s\n", "ID", "STATUS", "HEALTH")
+		fmt.Println("-------------------------------------------------------")
 
-		for _, f := range files {
-			id := f.Name()
+		lines := strings.Split(string(out), "\n")
 
-			status := getContainerStatus(id)
+		for _, line := range lines {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
 
-			fmt.Printf("%-25s %-10s\n", id, status)
+			parts := strings.SplitN(line, " ", 2)
+			name := parts[0]
+			status := parts[1]
+
+			if !strings.HasPrefix(name, "urx-") {
+				continue
+			}
+
+			health := getHealth(name)
+
+			fmt.Printf("%-25s %-12s %-10s\n", name, simplifyStatus(status), health)
 		}
 	},
 }
 
-func getContainerStatus(id string) string {
+func simplifyStatus(s string) string {
+	if strings.HasPrefix(s, "Up") {
+		return "running"
+	}
+	if strings.HasPrefix(s, "Exited") {
+		return "exited"
+	}
+	return "unknown"
+}
 
-	cmd := exec.Command("docker", "inspect", "-f", "{{.State.Status}}", id)
+func getHealth(container string) string {
 
-	output, err := cmd.Output()
+	out, err := exec.Command(
+		"docker", "exec", container,
+		"sh", "-c", "test -f /tmp/urx_health && echo healthy || echo unhealthy",
+	).Output()
+
 	if err != nil {
-		return "not_found"
+		return "-"
 	}
 
-	return strings.TrimSpace(string(output))
+	return strings.TrimSpace(string(out))
 }
 
 func init() {

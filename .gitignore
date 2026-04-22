@@ -8,3 +8,4 @@ data/output.txt
 
 # OS
 .DS_Store
+.env

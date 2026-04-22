@@ -1,17 +1,16 @@
-import time
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
-print("🚀 URX app started")
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write("Hello from URX".encode())
 
-# read from mounted volume
-with open("/app/data/input.txt", "r") as f:
-    content = f.read()
+print("URX app started")
 
-print("Read from volume:", content)
+# health indicator
+with open("/tmp/urx_health", "w") as f:
+    f.write("ok")
 
-# write back to host via volume
-with open("/app/data/output.txt", "w") as f:
-    f.write("written-by-urx")
-
-while True:
-    print("running...")
-    time.sleep(2)
+server = HTTPServer(("0.0.0.0", 8080), Handler)
+server.serve_forever()
