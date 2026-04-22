@@ -51,6 +51,21 @@ running...
 
 ---
 
+---
+
+## ⚙️ Installation (corrected)
+
+```md
+## ⚙️ Installation
+
+> Requires Docker to be installed and running.
+
+```bash
+git clone https://github.com/vijaythakur89/urx.git
+cd urx
+go build -o urx ./cmd/urx-cli
+sudo mv ./urx /usr/local/bin/
+
 ## 📁 Example (demo app)
 
 ```
@@ -109,13 +124,12 @@ source code → urx build → .urx artifact → urx run → container execution
 
 ## 📌 Why URX?
 
-Modern application execution is complex:
+Running apps today requires:
+- Writing Dockerfiles
+- Managing environments
+- Handling runtime inconsistencies
 
-* Dockerfiles
-* Environment setup
-* Runtime inconsistencies
-
-URX simplifies this into a single workflow.
+URX abstracts all of this into a single workflow.
 
 ---
 
@@ -124,7 +138,13 @@ URX simplifies this into a single workflow.
 This is an early-stage project (MVP). Contributions and feedback are welcome.
 
 ---
+## 🏗 Architecture
 
+- CLI (Cobra)
+- Artifact builder (tar + manifest)
+- Runtime engine (Docker)
+- Metadata store (~/.urx)
+- --
 ## 📜 License
 
 MIT
