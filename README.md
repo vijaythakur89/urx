@@ -33,6 +33,14 @@ sudo mv ./urx /usr/local/bin/
 
 ---
 
+## 🧩 Requirements
+
+- Docker must be installed and running
+- Go (only required for building URX from source)
+> URX relies on Docker as the container runtime (for now).
+
+---
+
 ## ⚡ Usage
 
 ### 1️⃣ Build artifact
