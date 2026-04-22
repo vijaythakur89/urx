@@ -1,24 +1,21 @@
-// TODO:
-// Add production container runtime:
-// - build Docker image
-// - push to registry
-// - run via image (no volume mount)
 package local
 
 import (
 	"archive/tar"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
-	"time"
 	"os"
 	"os/exec"
 	"path/filepath"
-        "crypto/sha256"
-	"encoding/hex"
+	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
+
 	"github.com/vijaythakur89/urx/artifacts/manifest"
-        "github.com/vijaythakur89/urx/pkg/storage"
+	"github.com/vijaythakur89/urx/pkg/storage"
 )
 
 func getFileHash(filePath string) (string, error) {
@@ -31,7 +28,7 @@ func getFileHash(filePath string) (string, error) {
 	return hex.EncodeToString(hash[:8]), nil
 }
 
-func Run(filePath string) error {
+func Run(filePath string, cliEnv []string) error {
 
 	// create temp dir
 	tempDir, err := os.MkdirTemp("", "urx-*")
@@ -49,8 +46,6 @@ func Run(filePath string) error {
 
 	tr := tar.NewReader(file)
 
-	var m manifest.Manifest
-
 	// extract files
 	for {
 		header, err := tr.Next()
@@ -64,6 +59,12 @@ func Run(filePath string) error {
 
 		targetPath := filepath.Join(tempDir, header.Name)
 
+		// create directory structure
+		err = os.MkdirAll(filepath.Dir(targetPath), os.ModePerm)
+		if err != nil {
+			return err
+		}
+
 		// create file
 		f, err := os.Create(targetPath)
 		if err != nil {
@@ -75,64 +76,119 @@ func Run(filePath string) error {
 			return err
 		}
 		f.Close()
+	}
 
-		// parse manifest
-		if header.Name == "manifest.yaml" {
-			data, err := os.ReadFile(targetPath)
-			if err != nil {
-				return err
-			}
+	// Parse manifest AFTER extraction
+	manifestPath := filepath.Join(tempDir, "manifest.yaml")
 
-			err = yaml.Unmarshal(data, &m)
-			if err != nil {
-				return err
-			}
+	var m manifest.Manifest
+
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return fmt.Errorf("manifest not found: %v", err)
+	}
+
+	err = yaml.Unmarshal(data, &m)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("DEBUG manifest: %+v\n", m)
+
+	// -----------------------------
+	// Build volume args
+	// -----------------------------
+	var volumeArgs []string
+
+	for _, v := range m.Volumes {
+		parts := strings.Split(v, ":")
+		if len(parts) == 2 {
+			hostPath := parts[0]
+			containerPath := parts[1]
+
+			volumeArgs = append(volumeArgs, "-v", hostPath+":"+containerPath)
 		}
 	}
 
-	fmt.Println("[URX] Running:", m.Entrypoint)
+	// -----------------------------
+	// Build env args
+	// -----------------------------
+	var envArgs []string
 
-//Define hash
-hash, err := getFileHash(filePath)
-if err != nil {
-    return err
-}
+	// from manifest
+	for _, e := range m.Env {
+		val := os.Getenv(e)
+		if val != "" {
+			envArgs = append(envArgs, "-e", e+"="+val)
+		}
+	}
 
-//Running Container
-containerName := "urx-" + hash
+	// from CLI
+	for _, e := range cliEnv {
+		envArgs = append(envArgs, "-e", e)
+	}
 
-// remove existing container if exists
-exec.Command("docker", "rm", "-f", containerName).Run()
+	// -----------------------------
+	// Define container name
+	// -----------------------------
+	hash, err := getFileHash(filePath)
+	if err != nil {
+		return err
+	}
 
-// ADD metadata saving
-meta := storage.RunMeta{
-	ID:        containerName,
-	Artifact:  filePath,
-	Timestamp: time.Now().Format(time.RFC3339),
-}
-storage.SaveMeta(containerName, meta)
+	containerName := "urx-" + hash
 
-// run container
-runCmd := exec.Command(
-	"docker", "run",
-	"-d",
-	"--name", containerName,
-	"-v", tempDir+":/app",
-	"python:3.11",
-	"python", "-u", "/app/"+m.Entrypoint,
-)
+	// remove existing container
+	exec.Command("docker", "rm", "-f", containerName).Run()
 
-runCmd.Stdout = nil
-runCmd.Stderr = os.Stderr
+	// save metadata
+	meta := storage.RunMeta{
+		ID:        containerName,
+		Artifact:  filePath,
+		Timestamp: time.Now().Format(time.RFC3339),
+	}
+	storage.SaveMeta(containerName, meta)
 
-fmt.Println("[URX] Running container:", containerName)
+	// -----------------------------
+	// Build docker command
+	// -----------------------------
+	args := []string{
+		"run",
+		"-d",
+		"--name", containerName,
+	}
 
-err = runCmd.Run()
-if err != nil {
-	return err
-}
+	// add env + volumes
+	args = append(args, envArgs...)
+	args = append(args, volumeArgs...)
 
-fmt.Println("[URX] View logs: urx logs", containerName)
+	// decide base image
+	image := m.BaseImage
+        if image == "" {
+            image = "python:3.11"
+        }
+	// mount app code + run	
+	args = append(args,
+	   "-v", tempDir+":/workspace",
+	   image,
+	   "python", "-u", "/workspace/"+m.Entrypoint,
+	)
 
-return nil
+	fmt.Println("DEBUG docker args:", args)
+
+	// run container
+	runCmd := exec.Command("docker", args...)
+	runCmd.Stdout = os.Stdout
+	runCmd.Stderr = os.Stderr
+
+	fmt.Println("[URX] Running container:", containerName)
+
+	err = runCmd.Run()
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("[URX] View logs: urx logs", containerName)
+
+	return nil
 }
