@@ -1,4 +1,10 @@
-urx
+# build artifacts
 *.urx
+urx
+
+# temp / runtime
 /tmp/
-*.log
+data/output.txt
+
+# OS
+.DS_Store
