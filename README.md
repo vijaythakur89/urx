@@ -27,9 +27,6 @@ git clone https://github.com/vijaythakur89/urx.git
 cd urx
 go build -o urx ./cmd/urx-cli
 sudo mv ./urx /usr/local/bin/
-```
-
-> Requires Docker to be installed and running.
 
 ---
 
