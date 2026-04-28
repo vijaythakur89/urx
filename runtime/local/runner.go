@@ -6,10 +6,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+        "net"
 	"os"
 	"os/exec"
 	"path/filepath"
-
+	"strings"
 	"gopkg.in/yaml.v3"
 
 	"github.com/vijaythakur89/urx/artifacts/manifest"
@@ -23,6 +24,16 @@ func getFileHash(filePath string) (string, error) {
 
 	hash := sha256.Sum256(file)
 	return hex.EncodeToString(hash[:8]), nil
+}
+func getFreePort() (int, error) {
+        listener, err := net.Listen("tcp", ":0")
+        if err != nil {
+                return 0, err
+        }
+        defer listener.Close()
+
+        addr := listener.Addr().(*net.TCPAddr)
+        return addr.Port, nil
 }
 
 func loadEnvFile(path string) map[string]string {
@@ -54,6 +65,7 @@ func loadEnvFile(path string) map[string]string {
 func Run(filePath string, cliEnv []string) error {
     return RunWithMode(filePath, "run", cliEnv)
 }
+
 
 func Deploy(filePath string) error {
 	return RunWithMode(filePath, "deploy", nil)
@@ -214,16 +226,32 @@ func RunWithMode(filePath string, mode string, cliEnv []string) error {
 	// -----------------------------
 	// 9. PORT EXPOSURE
 	// -----------------------------
-	// Expose service port if defined in manifest.
+	var exposedPort int
+
+	// decide host port
 	if m.Port != 0 {
-		port := fmt.Sprintf("%d:%d", m.Port, m.Port)
-		args = append(args, "-p", port)
+		exposedPort = m.Port
+	} else {
+		p, err := getFreePort()
+		if err != nil {
+			return err
+		}
+		exposedPort = p
 	}
+
+	// container internal port (app listens here)
+	containerPort := m.Port
+	if containerPort == 0 {
+		containerPort = 8080
+	}
+
+	// build mapping
+	portMapping := fmt.Sprintf("%d:%d", exposedPort, containerPort)
+	args = append(args, "-p", portMapping)
 
 	// Attach env + volumes
 	args = append(args, envArgs...)
 	args = append(args, volumeArgs...)
-
 	// -----------------------------
 	// 10. MOUNT APPLICATION CODE
 	// -----------------------------
@@ -234,8 +262,7 @@ func RunWithMode(filePath string, mode string, cliEnv []string) error {
 		"python", "-u", "/workspace/"+m.Entrypoint,
 	)
 
-	fmt.Println("DEBUG docker args:", args)
-
+	//DOcker Debug Mode //fmt.Println("DEBUG docker args:", args)
 	// -----------------------------
 	// 11. EXECUTE CONTAINER
 	// -----------------------------
@@ -247,7 +274,7 @@ func RunWithMode(filePath string, mode string, cliEnv []string) error {
 
 	err = runCmd.Run()
 	if err != nil {
-		return err
+    		return err
 	}
 
 	// -----------------------------
@@ -255,5 +282,13 @@ func RunWithMode(filePath string, mode string, cliEnv []string) error {
 	// -----------------------------
 	fmt.Println("[URX] View logs: urx logs", containerName)
 
+	// -----------------------------
+	// 13. URL OUTPUT (deploy only)
+	// -----------------------------
+	if mode == "deploy" {
+	    fmt.Println("🚀 Service deployed")
+	    fmt.Printf("URL: http://localhost:%d\n", exposedPort)
+	}
+
 	return nil
-}
+	}
