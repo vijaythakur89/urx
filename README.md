@@ -8,15 +8,17 @@ It simplifies application execution by removing the need for Dockerfiles and com
 
 ## ✨ Features
 
-* 📦 Package apps into a single `.urx` artifact
-* ▶️ Run apps locally with a single command
-* 🚀 Deploy apps as long-running services
-* 📁 Volume mounting support
-* 🔐 Environment variable injection (`.env`, CLI, system env)
-* ❤️ Health checks for running apps
-* 🐳 Custom base image support
-* 🌐 Service port exposure
-* 🔍 Inspect running apps (`ps`, `status`, `logs`)
+📦 Package apps into a single `.urx` artifact
+▶️ Run apps locally with a single command
+🚀 Deploy apps as long-running services
+📁 Volume mounting support
+🔐 Environment variable injection (`.env`, CLI, system env)
+❤️ Health checks for running apps
+🐳 Custom base image support
+🌐 Service port exposure
+🔍 Inspect running apps (`ps`, `status`, `logs`)
+🔌 JSON output support (`--json`)
+🧠 Persistent metadata storage (`~/.urx`)
 
 ---
 
@@ -27,13 +29,15 @@ git clone https://github.com/vijaythakur89/urx.git
 cd urx
 go build -o urx ./cmd/urx-cli
 sudo mv ./urx /usr/local/bin/
+```
 
 ---
 
 ## 🧩 Requirements
 
-- Docker must be installed and running
-- Go (only required for building URX from source)
+* Docker must be installed and running
+* Go (only required for building URX from source)
+
 > URX relies on Docker as the container runtime (for now).
 
 ---
@@ -62,12 +66,25 @@ urx run app.urx
 urx deploy app.urx
 ```
 
+After deployment:
+
+```
+🚀 Service deployed
+URL: http://localhost:<port>
+```
+
 ---
 
 ### 4️⃣ List running apps
 
 ```bash
 urx ps
+```
+
+#### JSON output
+
+```bash
+urx ps --json
 ```
 
 ---
@@ -78,12 +95,24 @@ urx ps
 urx status <id>
 ```
 
+#### JSON
+
+```bash
+urx status <id> --json
+```
+
 ---
 
 ### 6️⃣ View logs
 
 ```bash
 urx logs <id>
+```
+
+#### JSON
+
+```bash
+urx logs <id> --json
 ```
 
 ---
@@ -123,13 +152,13 @@ env:
 
 URX supports environment variables from multiple sources:
 
-1. `.env` file (recommended)
-2. System environment
-3. CLI flags (future support)
+* `.env` file (recommended)
+* System environment
+* CLI flags (future support)
 
 ### Example `.env`
 
-```
+```env
 TEST=hello
 API_KEY=xyz
 ```
@@ -168,7 +197,28 @@ urx deploy app.urx
 Access your app:
 
 ```
-http://localhost:8080
+http://localhost:<port>
+```
+
+---
+
+## 🧠 Metadata Storage
+
+URX stores runtime metadata at:
+
+```
+~/.urx/runs/<id>/meta.json
+```
+
+Example:
+
+```json
+{
+  "id": "urx-abc123",
+  "artifact": "app.urx",
+  "timestamp": "...",
+  "port": 8080
+}
 ```
 
 ---
@@ -183,18 +233,18 @@ source code → urx build → .urx artifact → urx run/deploy → container exe
 
 ## 🛠 Commands
 
-| Command       | Description       |
-| ------------- | ----------------- |
-| `urx build`   | Build artifact    |
-| `urx run`     | Run application   |
-| `urx deploy`  | Run as service    |
-| `urx ps`      | List running apps |
-| `urx status`  | Inspect app       |
-| `urx logs`    | View logs         |
-| `urx stop`    | Stop container    |
-| `urx rm`      | Remove container  |
-| `urx inspect` | Inspect artifact  |
-| `urx version` | Show version      |
+| Command     | Description       |
+| ----------- | ----------------- |
+| urx build   | Build artifact    |
+| urx run     | Run application   |
+| urx deploy  | Run as service    |
+| urx ps      | List running apps |
+| urx status  | Inspect app       |
+| urx logs    | View logs         |
+| urx stop    | Stop container    |
+| urx rm      | Remove container  |
+| urx inspect | Inspect artifact  |
+| urx version | Show version      |
 
 ---
 
@@ -208,7 +258,7 @@ Modern application execution is complex:
 
 URX simplifies this into a single workflow:
 
-👉 **Build once, run anywhere**
+👉 Build once, run anywhere
 
 ---
 
@@ -219,6 +269,7 @@ URX simplifies this into a single workflow:
 * Multi-runtime support (Node, Go, Java)
 * Remote execution
 * Secrets management enhancements
+* Streaming logs (`urx logs -f`)
 
 ---
 
