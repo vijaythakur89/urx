@@ -8,17 +8,17 @@ It simplifies application execution by removing the need for Dockerfiles and com
 
 ## ✨ Features
 
-📦 Package apps into a single `.urx` artifact
-▶️ Run apps locally with a single command
-🚀 Deploy apps as long-running services
-📁 Volume mounting support
-🔐 Environment variable injection (`.env`, CLI, system env)
-❤️ Health checks for running apps
-🐳 Custom base image support
-🌐 Service port exposure
-🔍 Inspect running apps (`ps`, `status`, `logs`)
-🔌 JSON output support (`--json`)
-🧠 Persistent metadata storage (`~/.urx`)
+- 📦 Package apps into a single `.urx` artifact  
+- ▶️ Run apps locally with a single command  
+- 🚀 Deploy apps as long-running services  
+- 📁 Volume mounting support  
+- 🔐 Environment variable injection (`.env`, CLI, system env)  
+- ❤️ Health checks for running apps  
+- 🐳 Custom base image support  
+- 🌐 Service port exposure  
+- 🔍 Inspect running apps (`ps`, `status`, `logs`)  
+- 🔌 JSON output support (`--json`)  
+- 🧠 Persistent metadata storage (`~/.urx`)
 
 ---
 
