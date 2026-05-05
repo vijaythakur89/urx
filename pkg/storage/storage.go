@@ -13,25 +13,43 @@ type RunMeta struct {
 	Port      int    `json:"port"`
 }
 
+// base dir: ~/.urx/runs/<id>
 func GetRunDir(id string) string {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
 	return filepath.Join(home, ".urx", "runs", id)
 }
 
+// save metadata safely
 func SaveMeta(id string, meta RunMeta) error {
 	dir := GetRunDir(id)
-	os.MkdirAll(dir, 0755)
+	if dir == "" {
+		return nil
+	}
+
+	err := os.MkdirAll(dir, 0755)
+	if err != nil {
+		return err
+	}
 
 	file := filepath.Join(dir, "meta.json")
 
-	data, _ := json.MarshalIndent(meta, "", "  ")
+	data, err := json.MarshalIndent(meta, "", "  ")
+	if err != nil {
+		return err
+	}
+
 	return os.WriteFile(file, data, 0644)
 }
 
+// log file path helper
 func LogFilePath(id string) string {
 	return filepath.Join(GetRunDir(id), "logs.txt")
 }
 
+// load all metadata
 func LoadAllMeta() ([]RunMeta, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -42,6 +60,10 @@ func LoadAllMeta() ([]RunMeta, error) {
 
 	files, err := os.ReadDir(runsDir)
 	if err != nil {
+		// ✅ important: handle first run (directory doesn't exist)
+		if os.IsNotExist(err) {
+			return []RunMeta{}, nil
+		}
 		return nil, err
 	}
 

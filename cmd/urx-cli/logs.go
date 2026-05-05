@@ -1,42 +1,65 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
 
-var follow bool
+var logsJSON bool
+
+type LogsOutput struct {
+	ID   string   `json:"id"`
+	Logs []string `json:"logs"`
+}
 
 var logsCmd = &cobra.Command{
 	Use:   "logs [id]",
-	Short: "Show logs for a URX run",
+	Short: "View logs of a URX container",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 
 		id := args[0]
 
-		var logCmd *exec.Cmd
-
-		if follow {
-			logCmd = exec.Command("docker", "logs", "-f", id)
-		} else {
-			logCmd = exec.Command("docker", "logs", id)
-		}
-
-		logCmd.Stdout = os.Stdout
-		logCmd.Stderr = os.Stderr
-
-		err := logCmd.Run()
+		out, err := exec.Command("docker", "logs", id).Output()
 		if err != nil {
-			fmt.Println("[URX] Error fetching logs:", err)
+			fmt.Println("Error:", err)
+			return
 		}
+
+		logText := strings.TrimSpace(string(out))
+
+		// JSON output
+		if logsJSON {
+			lines := []string{}
+			if logText != "" {
+				lines = strings.Split(logText, "\n")
+			}
+
+			result := LogsOutput{
+				ID:   id,
+				Logs: lines,
+			}
+
+			data, err := json.MarshalIndent(result, "", "  ")
+			if err != nil {
+				fmt.Println("Error:", err)
+				return
+			}
+
+			fmt.Println(string(data))
+			return
+		}
+
+		// default output
+		fmt.Println(logText)
 	},
 }
 
 func init() {
-	logsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Follow logs output")
 	rootCmd.AddCommand(logsCmd)
+	logsCmd.Flags().BoolVar(&logsJSON, "json", false, "Output in JSON format")
 }

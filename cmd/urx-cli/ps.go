@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -23,6 +24,13 @@ type PsOutput struct {
 	Age    string `json:"age"`
 }
 
+// check if container exists
+func containerExists(id string) bool {
+	cmd := exec.Command("docker", "inspect", id)
+	err := cmd.Run()
+	return err == nil
+}
+
 // health check
 func getHealth(container string) string {
 	out, err := exec.Command(
@@ -31,7 +39,7 @@ func getHealth(container string) string {
 	).Output()
 
 	if err != nil {
-		return "-" // keep consistent with your current behavior
+		return "-"
 	}
 
 	return strings.TrimSpace(string(out))
@@ -43,10 +51,10 @@ var psCmd = &cobra.Command{
 	Short: "List running URX containers",
 	Run: func(cmd *cobra.Command, args []string) {
 
-		// get docker ps output
+		// get docker ps output (FIXED parsing)
 		out, err := exec.Command(
 			"docker", "ps", "-a",
-			"--format", "{{.Names}} {{.Status}}",
+			"--format", "{{.Names}}|{{.Status}}",
 		).Output()
 
 		if err != nil {
@@ -64,7 +72,6 @@ var psCmd = &cobra.Command{
 			metaMap[m.ID] = m
 		}
 
-		// collect results
 		var results []PsOutput
 
 		for _, line := range lines {
@@ -72,7 +79,7 @@ var psCmd = &cobra.Command{
 				continue
 			}
 
-			parts := strings.SplitN(line, " ", 2)
+			parts := strings.SplitN(line, "|", 2)
 			if len(parts) < 2 {
 				continue
 			}
@@ -85,19 +92,26 @@ var psCmd = &cobra.Command{
 				continue
 			}
 
+			// stale metadata cleanup
+			if !containerExists(id) {
+				os.RemoveAll(storage.GetRunDir(id))
+				continue
+			}
+
 			health := getHealth(id)
 
 			meta, ok := metaMap[id]
-			
 			if !ok {
-				meta = storage.RunMeta{} // fallback
+				meta = storage.RunMeta{}
 			}
 
 			// calculate age
 			age := "-"
 			if meta.Timestamp != "" {
-				t, _ := time.Parse(time.RFC3339, meta.Timestamp)
-				age = time.Since(t).Round(time.Second).String()
+				t, err := time.Parse(time.RFC3339, meta.Timestamp)
+				if err == nil {
+					age = time.Since(t).Round(time.Second).String()
+				}
 			}
 
 			results = append(results, PsOutput{
@@ -109,9 +123,13 @@ var psCmd = &cobra.Command{
 			})
 		}
 
-		// JSON output
+		// JSON output (FIXED error handling)
 		if outputJSON {
-			data, _ := json.MarshalIndent(results, "", "  ")
+			data, err := json.MarshalIndent(results, "", "  ")
+			if err != nil {
+				fmt.Println("Error:", err)
+				return
+			}
 			fmt.Println(string(data))
 			return
 		}
