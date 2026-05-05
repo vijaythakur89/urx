@@ -10,6 +10,7 @@ type RunMeta struct {
 	ID        string `json:"id"`
 	Artifact  string `json:"artifact"`
 	Timestamp string `json:"timestamp"`
+	Port      int    `json:"port"`
 }
 
 func GetRunDir(id string) string {
@@ -29,4 +30,39 @@ func SaveMeta(id string, meta RunMeta) error {
 
 func LogFilePath(id string) string {
 	return filepath.Join(GetRunDir(id), "logs.txt")
+}
+
+func LoadAllMeta() ([]RunMeta, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+
+	runsDir := filepath.Join(home, ".urx", "runs")
+
+	files, err := os.ReadDir(runsDir)
+	if err != nil {
+		return nil, err
+	}
+
+	var metas []RunMeta
+
+	for _, f := range files {
+		metaPath := filepath.Join(runsDir, f.Name(), "meta.json")
+
+		data, err := os.ReadFile(metaPath)
+		if err != nil {
+			continue
+		}
+
+		var m RunMeta
+		err = json.Unmarshal(data, &m)
+		if err != nil {
+			continue
+		}
+
+		metas = append(metas, m)
+	}
+
+	return metas, nil
 }

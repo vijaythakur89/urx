@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"io"
         "net"
+	"time"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"gopkg.in/yaml.v3"
 
+	"github.com/vijaythakur89/urx/pkg/storage"
 	"github.com/vijaythakur89/urx/artifacts/manifest"
 )
 
@@ -273,9 +275,21 @@ func RunWithMode(filePath string, mode string, cliEnv []string) error {
 	fmt.Println("[URX] Running container:", containerName)
 
 	err = runCmd.Run()
-	if err != nil {
-    		return err
-	}
+        if err != nil {
+                return err
+        }
+
+	// -----------------------------
+	// SAVE METADATA (IMPORTANT)
+	// -----------------------------
+	meta := storage.RunMeta{
+		ID:        containerName,
+		Artifact:  filePath,
+		Timestamp: time.Now().Format(time.RFC3339),
+		Port:      exposedPort,
+	}	
+
+	storage.SaveMeta(containerName, meta)
 
 	// -----------------------------
 	// 12. USER GUIDANCE
