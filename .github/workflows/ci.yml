@@ -1,0 +1,31 @@
+name: URX CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Verify Formatting
+        run: gofmt -l .
+
+      - name: Go Vet
+        run: go vet ./...
+
+      - name: Run Tests
+        run: go test ./... -coverprofile=coverage.out
+
+      - name: Show Coverage
+        run: go tool cover -func=coverage.out
