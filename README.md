@@ -1,4 +1,4 @@
-# 🚀 URX — Universal Runtime eXecutor
+# URX — Universal Runtime eXecutor
 
 URX is a lightweight CLI tool that lets you package and run applications as portable `.urx` artifacts.
 
@@ -6,7 +6,7 @@ It simplifies application execution by removing the need for Dockerfiles and com
 
 ---
 
-## ✨ Features
+## Features
 
 - 📦 Package apps into a single `.urx` artifact  
 - ▶️ Run apps locally with a single command  
@@ -22,7 +22,7 @@ It simplifies application execution by removing the need for Dockerfiles and com
 
 ---
 
-## ⚡ Installation
+## Installation
 
 ```bash
 git clone https://github.com/vijaythakur89/urx.git
@@ -33,7 +33,7 @@ sudo mv ./urx /usr/local/bin/
 
 ---
 
-## 🧩 Requirements
+## Requirements
 
 * Docker must be installed and running
 * Go (only required for building URX from source)
@@ -42,7 +42,7 @@ sudo mv ./urx /usr/local/bin/
 
 ---
 
-## ⚡ Usage
+## Usage
 
 ### 1️⃣ Build artifact
 
@@ -69,7 +69,7 @@ urx deploy app.urx
 After deployment:
 
 ```
-🚀 Service deployed
+Service deployed
 URL: http://localhost:<port>
 ```
 
@@ -148,7 +148,7 @@ env:
 
 ---
 
-## 🔐 Environment Variables
+## Environment Variables
 
 URX supports environment variables from multiple sources:
 
@@ -165,7 +165,7 @@ API_KEY=xyz
 
 ---
 
-## 🌐 Example HTTP App
+## Example HTTP App
 
 ```python
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -186,7 +186,7 @@ server.serve_forever()
 
 ---
 
-## 🌍 Accessing Deployed App
+## Accessing Deployed App
 
 After deployment:
 
@@ -202,7 +202,7 @@ http://localhost:<port>
 
 ---
 
-## 🧠 Metadata Storage
+## Metadata Storage
 
 URX stores runtime metadata at:
 
@@ -223,7 +223,7 @@ Example:
 
 ---
 
-## 🧠 How it works
+## How it works
 
 ```
 source code → urx build → .urx artifact → urx run/deploy → container execution
@@ -248,7 +248,7 @@ source code → urx build → .urx artifact → urx run/deploy → container exe
 
 ---
 
-## 📌 Why URX?
+## Why URX?
 
 Modern application execution is complex:
 
