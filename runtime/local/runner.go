@@ -5,17 +5,18 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"gopkg.in/yaml.v3"
 	"io"
-        "net"
-	"time"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"gopkg.in/yaml.v3"
+	"time"
 
-	"github.com/vijaythakur89/urx/pkg/storage"
 	"github.com/vijaythakur89/urx/artifacts/manifest"
+	"github.com/vijaythakur89/urx/pkg/events"
+	"github.com/vijaythakur89/urx/pkg/storage"
 )
 
 func getFileHash(filePath string) (string, error) {
@@ -28,14 +29,14 @@ func getFileHash(filePath string) (string, error) {
 	return hex.EncodeToString(hash[:8]), nil
 }
 func getFreePort() (int, error) {
-        listener, err := net.Listen("tcp", ":0")
-        if err != nil {
-                return 0, err
-        }
-        defer listener.Close()
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		return 0, err
+	}
+	defer listener.Close()
 
-        addr := listener.Addr().(*net.TCPAddr)
-        return addr.Port, nil
+	addr := listener.Addr().(*net.TCPAddr)
+	return addr.Port, nil
 }
 
 func loadEnvFile(path string) map[string]string {
@@ -65,9 +66,8 @@ func loadEnvFile(path string) map[string]string {
 }
 
 func Run(filePath string, cliEnv []string) error {
-    return RunWithMode(filePath, "run", cliEnv)
+	return RunWithMode(filePath, "run", cliEnv)
 }
-
 
 func Deploy(filePath string) error {
 	return RunWithMode(filePath, "deploy", nil)
@@ -177,21 +177,21 @@ func RunWithMode(filePath string, mode string, cliEnv []string) error {
 	// 2. manifest env
 	for _, e := range m.Env {
 
-	// priority: .env → system env
-	val := envFile[e]
+		// priority: .env → system env
+		val := envFile[e]
 
-	if val == "" {
-		val = os.Getenv(e)
-	}
+		if val == "" {
+			val = os.Getenv(e)
+		}
 
-	if val != "" {
-		envArgs = append(envArgs, "-e", e+"="+val)
-	}
+		if val != "" {
+			envArgs = append(envArgs, "-e", e+"="+val)
+		}
 	}
 
 	// 3. CLI env (highest priority)
 	for _, e := range cliEnv {
-	envArgs = append(envArgs, "-e", e)
+		envArgs = append(envArgs, "-e", e)
 	}
 
 	// -----------------------------
@@ -203,6 +203,20 @@ func RunWithMode(filePath string, mode string, cliEnv []string) error {
 		return err
 	}
 	containerName := "urx-" + hash
+	// Initialize lifecycle event emitter.
+	eventEmitter, err := events.NewEmitter(storage.EventFilePath(containerName))
+	if err != nil {
+		return err
+	}
+
+	if err := eventEmitter.Emit(events.Event{
+		Type:      events.RunStarted,
+		Component: "runtime",
+		RunID:     containerName,
+		Message:   "URX run started",
+	}); err != nil {
+		return err
+	}
 
 	// Remove existing container with same name (idempotent behavior)
 	exec.Command("docker", "rm", "-f", containerName).Run()
@@ -275,10 +289,62 @@ func RunWithMode(filePath string, mode string, cliEnv []string) error {
 	fmt.Println("[URX] Running container:", containerName)
 
 	err = runCmd.Run()
-        if err != nil {
-                return err
-        }
+	if err != nil {
 
+		// Container failed to start/run.
+		_ = eventEmitter.Emit(events.Event{
+			Type:      events.ContainerFailed,
+			Component: "docker",
+			RunID:     containerName,
+			Message:   err.Error(),
+		})
+
+		// URX operation failed.
+		_ = eventEmitter.Emit(events.Event{
+			Type:      events.RunFailed,
+			Component: "runtime",
+			RunID:     containerName,
+			Message:   err.Error(),
+		})
+
+		return err
+	}
+
+	if err := eventEmitter.Emit(events.Event{
+		Type:      events.ContainerStarted,
+		Component: "docker",
+		RunID:     containerName,
+		Message:   "Container started successfully",
+	}); err != nil {
+		return err
+	}
+	// Wait for the container to finish and determine the actual result.
+	waitCmd := exec.Command("docker", "wait", containerName)
+
+	output, err := waitCmd.Output()
+	if err != nil {
+		_ = eventEmitter.Emit(events.Event{
+			Type:      events.RunFailed,
+			Component: "runtime",
+			RunID:     containerName,
+			Message:   err.Error(),
+		})
+
+		return err
+	}
+
+	exitCode := strings.TrimSpace(string(output))
+
+	if exitCode != "0" {
+		_ = eventEmitter.Emit(events.Event{
+			Type:      events.RunFailed,
+			Component: "runtime",
+			RunID:     containerName,
+			Message:   "Container exited with code " + exitCode,
+		})
+
+		return fmt.Errorf("container exited with code %s", exitCode)
+	}
 	// -----------------------------
 	// SAVE METADATA (IMPORTANT)
 	// -----------------------------
@@ -287,7 +353,7 @@ func RunWithMode(filePath string, mode string, cliEnv []string) error {
 		Artifact:  filePath,
 		Timestamp: time.Now().Format(time.RFC3339),
 		Port:      exposedPort,
-	}	
+	}
 
 	storage.SaveMeta(containerName, meta)
 
@@ -300,9 +366,16 @@ func RunWithMode(filePath string, mode string, cliEnv []string) error {
 	// 13. URL OUTPUT (deploy only)
 	// -----------------------------
 	if mode == "deploy" {
-	    fmt.Println("🚀 Service deployed")
-	    fmt.Printf("URL: http://localhost:%d\n", exposedPort)
+		fmt.Println("Service deployed")
+		fmt.Printf("URL: http://localhost:%d\n", exposedPort)
 	}
-
+	if err := eventEmitter.Emit(events.Event{
+		Type:      events.RunCompleted,
+		Component: "runtime",
+		RunID:     containerName,
+		Message:   "URX run completed",
+	}); err != nil {
+		return err
+	}
 	return nil
-	}
+}

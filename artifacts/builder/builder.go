@@ -6,18 +6,28 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-)
-import (
-    
-    "gopkg.in/yaml.v3"
-    "github.com/vijaythakur89/urx/artifacts/manifest"
+
+	"github.com/vijaythakur89/urx/artifacts/manifest"
+	"gopkg.in/yaml.v3"
 )
 
-// Build creates a .urx file from a directory
+// Build creates a .urx file from a directory.
 func Build(sourceDir string, outputFile string) error {
 
-	// create output file
-	file, err := os.Create(outputFile)
+	// Resolve absolute paths so we can safely identify the output artifact
+	// while walking the source directory.
+	sourceAbs, err := filepath.Abs(sourceDir)
+	if err != nil {
+		return err
+	}
+
+	outputAbs, err := filepath.Abs(outputFile)
+	if err != nil {
+		return err
+	}
+
+	// Create the output artifact.
+	file, err := os.Create(outputAbs)
 	if err != nil {
 		return err
 	}
@@ -26,72 +36,83 @@ func Build(sourceDir string, outputFile string) error {
 	tw := tar.NewWriter(file)
 	defer tw.Close()
 
-        // create default manifest
+	// Create default manifest.
 	m := manifest.Manifest{
-	    Name:       filepath.Base(sourceDir),
-	    Runtime:    "python",
-	    Entrypoint: "app.py",
-	    Isolation:  "low",
- }
+		Name:       filepath.Base(sourceAbs),
+		Runtime:    "python",
+		Entrypoint: "app.py",
+		Isolation:  "low",
+	}
 
-	// convert to YAML
+	// Convert manifest to YAML.
 	data, err := yaml.Marshal(m)
 	if err != nil {
-	    return err
- }
+		return err
+	}
 
-	// write manifest into tar
+	// Write manifest into tar.
 	header := &tar.Header{
-	    Name: "manifest.yaml",
-	    Mode: 0600,
-	    Size: int64(len(data)),
- } 
+		Name: "manifest.yaml",
+		Mode: 0600,
+		Size: int64(len(data)),
+	}
 
- if err := tw.WriteHeader(header); err != nil {
-	return err
- }
+	if err := tw.WriteHeader(header); err != nil {
+		return err
+	}
 
- if _, err := tw.Write(data); err != nil {
-	return err
- }
+	if _, err := tw.Write(data); err != nil {
+		return err
+	}
 
-	// walk through source directory
-	err = filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
+	// Walk through source directory.
+	err = filepath.Walk(sourceAbs, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// skip directories
+		// Skip directories.
 		if info.IsDir() {
 			return nil
 		}
 
-		// open file
+		// Never package the output artifact itself.
+		pathAbs, err := filepath.Abs(path)
+		if err != nil {
+			return err
+		}
+
+		if pathAbs == outputAbs {
+			return nil
+		}
+
+		// Open file.
 		f, err := os.Open(path)
 		if err != nil {
 			return err
 		}
 		defer f.Close()
 
-		// create tar header
+		// Create tar header.
 		header, err := tar.FileInfoHeader(info, "")
 		if err != nil {
 			return err
 		}
 
-		// fix name (relative path)
-		relPath, err := filepath.Rel(sourceDir, path)
+		// Use a path relative to the source directory.
+		relPath, err := filepath.Rel(sourceAbs, pathAbs)
 		if err != nil {
 			return err
 		}
+
 		header.Name = relPath
 
-		// write header
+		// Write header.
 		if err := tw.WriteHeader(header); err != nil {
 			return err
 		}
 
-		// write file content
+		// Write file content.
 		if _, err := io.Copy(tw, f); err != nil {
 			return err
 		}

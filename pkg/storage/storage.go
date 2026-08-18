@@ -49,6 +49,11 @@ func LogFilePath(id string) string {
 	return filepath.Join(GetRunDir(id), "logs.txt")
 }
 
+// EventFilePath returns the path to the lifecycle event log for a run.
+func EventFilePath(id string) string {
+	return filepath.Join(GetRunDir(id), "events.jsonl")
+}
+
 // load all metadata
 func LoadAllMeta() ([]RunMeta, error) {
 	home, err := os.UserHomeDir()
