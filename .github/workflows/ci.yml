@@ -9,7 +9,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -17,9 +16,10 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.22'
+          cache: true
 
       - name: Verify Formatting
-        run: gofmt -l .
+        run: test -z "$(gofmt -l .)"
 
       - name: Go Vet
         run: go vet ./...
@@ -29,3 +29,6 @@ jobs:
 
       - name: Show Coverage
         run: go tool cover -func=coverage.out
+
+      - name: Build
+        run: go build -o urx ./cmd/urx-cli
