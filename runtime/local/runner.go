@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"io"
 	"net"
 	"os"
@@ -95,8 +94,6 @@ func RunWithMode(filePath string, mode string, cliEnv []string) error {
 
 	tr := tar.NewReader(file)
 
-	var m manifest.Manifest
-
 	// Loop through all files inside the tar archive
 	for {
 		header, err := tr.Next()
@@ -128,16 +125,10 @@ func RunWithMode(filePath string, mode string, cliEnv []string) error {
 	}
 
 	// -----------------------------
-	// 2. PARSE MANIFEST
+	// 2. PARSE APPLICATION CONTRACT
 	// -----------------------------
-	// Read manifest.yaml AFTER extraction (critical fix)
-	// This defines how the app should run.
-	data, err := os.ReadFile(filepath.Join(tempDir, "manifest.yaml"))
-	if err != nil {
-		return err
-	}
-
-	err = yaml.Unmarshal(data, &m)
+	// The canonical contract is always stored at the archive root as urx.yaml.
+	application, err := loadApplicationContract(tempDir)
 	if err != nil {
 		return err
 	}
@@ -145,22 +136,9 @@ func RunWithMode(filePath string, mode string, cliEnv []string) error {
 	// -----------------------------
 	// 3. RUNTIME CONFIG RESOLUTION
 	// -----------------------------
-	// Decide which container image to use.
-	// If user didn't specify, fallback to default runtime.
-	image := m.BaseImage
-	if image == "" {
-		image = "python:3.11"
-	}
-
-	// -----------------------------
-	// 4. BUILD VOLUME MOUNTS
-	// -----------------------------
-	// Convert manifest volumes into docker "-v" flags.
-	// Example: "/host:/container"
-	var volumeArgs []string
-	for _, v := range m.Volumes {
-		volumeArgs = append(volumeArgs, "-v", v)
-	}
+	// Contract v1 supports Python. The image remains a local-executor detail,
+	// rather than application-owned contract configuration.
+	image := "python:3.11"
 
 	// -----------------------------
 	// 5. BUILD ENV VARIABLES
@@ -172,20 +150,22 @@ func RunWithMode(filePath string, mode string, cliEnv []string) error {
 	var envArgs []string
 
 	// 1. load .env from project
-	envFile := loadEnvFile(filepath.Join(tempDir, ".env"))
+	envFile := loadEnvFile(filepath.Join(tempDir, "app", ".env"))
 
-	// 2. manifest env
-	for _, e := range m.Env {
+	// 2. contract environment requirements
+	if application.Spec.Environment != nil {
+		for _, e := range application.Spec.Environment.Required {
 
-		// priority: .env → system env
-		val := envFile[e]
+			// priority: .env → system env
+			val := envFile[e]
 
-		if val == "" {
-			val = os.Getenv(e)
-		}
+			if val == "" {
+				val = os.Getenv(e)
+			}
 
-		if val != "" {
-			envArgs = append(envArgs, "-e", e+"="+val)
+			if val != "" {
+				envArgs = append(envArgs, "-e", e+"="+val)
+			}
 		}
 	}
 
@@ -245,8 +225,10 @@ func RunWithMode(filePath string, mode string, cliEnv []string) error {
 	var exposedPort int
 
 	// decide host port
-	if m.Port != 0 {
-		exposedPort = m.Port
+	containerPort := 8080
+	if application.Spec.Service != nil && application.Spec.Service.ListenPort != 0 {
+		containerPort = application.Spec.Service.ListenPort
+		exposedPort = containerPort
 	} else {
 		p, err := getFreePort()
 		if err != nil {
@@ -255,27 +237,20 @@ func RunWithMode(filePath string, mode string, cliEnv []string) error {
 		exposedPort = p
 	}
 
-	// container internal port (app listens here)
-	containerPort := m.Port
-	if containerPort == 0 {
-		containerPort = 8080
-	}
-
 	// build mapping
 	portMapping := fmt.Sprintf("%d:%d", exposedPort, containerPort)
 	args = append(args, "-p", portMapping)
 
-	// Attach env + volumes
+	// Attach environment configuration.
 	args = append(args, envArgs...)
-	args = append(args, volumeArgs...)
 	// -----------------------------
 	// 10. MOUNT APPLICATION CODE
 	// -----------------------------
-	// Mount extracted workspace into container.
+	// Mount extracted application payload into the local executor workspace.
 	args = append(args,
 		"-v", tempDir+":/workspace",
 		image,
-		"python", "-u", "/workspace/"+m.Entrypoint,
+		"python", "-u", "/workspace/app/"+application.Spec.Entrypoint,
 	)
 
 	//DOcker Debug Mode //fmt.Println("DEBUG docker args:", args)
@@ -378,4 +353,18 @@ func RunWithMode(filePath string, mode string, cliEnv []string) error {
 		return err
 	}
 	return nil
+}
+
+func loadApplicationContract(workspace string) (manifest.Application, error) {
+	data, err := os.ReadFile(filepath.Join(workspace, "urx.yaml"))
+	if err != nil {
+		return manifest.Application{}, err
+	}
+
+	application, err := manifest.ParseAndValidate(data)
+	if err != nil {
+		return manifest.Application{}, fmt.Errorf("invalid urx.yaml: %w", err)
+	}
+
+	return application, nil
 }

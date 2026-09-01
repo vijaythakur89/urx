@@ -13,3 +13,10 @@ func (m *MockDockerClient) Logs(id string) ([]byte, error) {
 func (m *MockDockerClient) Inspect(id string) ([]byte, error) {
 	return []byte("running"), nil
 }
+func (m *MockDockerClient) Wait(id string) (string, error) {
+	return "0", nil
+}
+
+func (m *MockDockerClient) Remove(id string) error {
+	return nil
+}
