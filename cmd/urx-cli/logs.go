@@ -25,35 +25,35 @@ var logsCmd = &cobra.Command{
 
 		id := args[0]
 
-// Follow mode
-if followLogs {
+		// Follow mode
+		if followLogs {
 
-        if logsJSON {
-                fmt.Println("Error: --json cannot be used with --follow")
-                return
-        }
+			if logsJSON {
+				fmt.Println("Error: --json cannot be used with --follow")
+				return
+			}
 
-        followCmd := exec.Command("docker", "logs", "-f", id)
-        followCmd.Stdout = cmd.OutOrStdout()
-        followCmd.Stderr = cmd.ErrOrStderr()
+			followCmd := exec.Command("docker", "logs", "-f", id)
+			followCmd.Stdout = cmd.OutOrStdout()
+			followCmd.Stderr = cmd.ErrOrStderr()
 
-        if err := followCmd.Run(); err != nil {
-                fmt.Println("Error:", err)
-        }
+			if err := followCmd.Run(); err != nil {
+				fmt.Println("Error:", err)
+			}
 
-        return
-}
+			return
+		}
 
-// Normal mode
-out, err := exec.Command("docker", "logs", id).Output()
-if err != nil {
-        fmt.Println("Error:", err)
-        return
-}
+		// Normal mode
+		out, err := exec.Command("docker", "logs", id).Output()
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
 
 		logText := strings.TrimSpace(string(out))
 
-// JSON output
+		// JSON output
 		if logsJSON {
 			lines := []string{}
 			if logText != "" {
@@ -75,14 +75,14 @@ if err != nil {
 			return
 		}
 
-// default output
+		// default output
 		fmt.Println(logText)
 	},
 }
 
 func init() {
-        rootCmd.AddCommand(logsCmd)
+	rootCmd.AddCommand(logsCmd)
 
-        logsCmd.Flags().BoolVar(&logsJSON, "json", false, "Output in JSON format")
-        logsCmd.Flags().BoolVarP(&followLogs, "follow", "f", false, "Follow log output")
+	logsCmd.Flags().BoolVar(&logsJSON, "json", false, "Output in JSON format")
+	logsCmd.Flags().BoolVarP(&followLogs, "follow", "f", false, "Follow log output")
 }
